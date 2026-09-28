@@ -1,100 +1,80 @@
-# 🚀 API REST - Agencia de Marketing Digital
+# API REST de agencias de seguros de salud
 
-Sistema backend desarrollado con Express.js, Node.js y **pnpm**. Implementa autenticación JWT, autorización RBAC y medidas de seguridad OWASP conforme a los requerimientos de la **Semana 7 y 8**.
+API desarrollada con Express.js y JavaScript ES Modules, siguiendo la arquitectura del Repo B. Implementa los contenidos de las semanas 7 y 8 del Repo A: autenticación con JWT y cookies HttpOnly, rotación de refresh tokens, autorización RBAC y medidas de seguridad HTTP. El dominio gestiona agencias, pólizas, planes y reclamaciones de seguros de salud.
 
----
+## Tecnologías
 
-## 🛠️ Tecnologías y Herramientas
+- Node.js, Express 5 y pnpm
+- JWT (`jsonwebtoken`) y contraseñas con bcryptjs
+- Helmet, CORS con lista permitida y `express-rate-limit`
+- Datos de demostración en memoria (`src/data/db.js`)
 
-- **Entorno de ejecución:** Node.js (ES Modules - `type: "module"`)
-- **Framework:** Express.js v5
-- **Gestor de paquetes:** `pnpm`
-- **Autenticación:** `jsonwebtoken` (JWT) + `bcryptjs`
-- **Seguridad HTTP:** `helmet`, `cors`, `express-rate-limit`
-- **Variables de Entorno:** `dotenv`
+## Estructura
 
----
+```text
+src/
+├── controllers/       # Autenticación y operaciones del dominio
+├── data/              # Datos de demostración en memoria
+├── middlewares/       # JWT, RBAC, CORS, sanitización y límites de tasa
+├── routes/            # Rutas de autenticación y negocio
+└── index.js           # Configuración y servidor Express
+```
 
-## 📁 Arquitectura del Proyecto
+## Inicio
 
-agencia-marketing-api/
-├── src/
-│   ├── controllers/
-│   │   ├── agency.controller.js     # Lógica de negocio (Clients, Campaigns, Channels, Metrics)
-│   │   └── auth.controller.js       # Autenticación y generación de JWT
-│   ├── data/
-│   │   └── db.js                    # Base de datos simulada en memoria
-│   ├── middlewares/
-│   │   ├── auth.middleware.js       # [Semana 7 & 8] JWT y Control de Roles (RBAC)
-│   │   └── security.middleware.js   # [Semana 8] Rate Limiter
-│   ├── routes/
-│   │   ├── agency.routes.js         # Rutas protegidas del dominio
-│   │   └── auth.routes.js           # Rutas públicas de autenticación
-│   └── index.js                     # Servidor Express y seguridad global
-├── .env                             # Variables de entorno
-├── package.json
-└── README.md
+```bash
+pnpm install
+cp .env.example .env
+```
 
----
+Configura dos secretos distintos, aleatorios y de al menos 32 caracteres en `.env` (`JWT_ACCESS_SECRET` y `JWT_REFRESH_SECRET`). Ajusta `CORS_ORIGINS` como una lista de orígenes separados por comas y luego inicia el servidor:
 
-## 🔐 Implementación Semanal
+```bash
+pnpm dev
+```
 
-### 🛡️ Semana 7: Autenticación con JWT
-- **Cifrado de contraseñas:** Uso de `bcryptjs` para comparar contraseñas de forma segura.
-- **Generación de JWT:** Creación de Tokens firmados con tiempo de expiración (2 horas) en `/api/auth/login`.
-- **Protección de rutas:** Middleware `verifyToken` que valida la cabecera `Authorization: Bearer <TOKEN>`.
+El servicio queda disponible en `http://localhost:3000`; `GET /health` devuelve el estado. Los datos y refresh tokens se guardan en memoria y se reinician al detener el proceso. Las cuentas iniciales son `admin@saludsegura.com`, `agente@saludsegura.com` y `analista@saludsegura.com`, todas con contraseña `admin123`; solo para desarrollo local.
 
-### 🛡️ Semana 8: Autorización y Seguridad OWASP
-- **Control de Acceso Basado en Roles (RBAC):** Middleware `requireRoles` para restringir accesos (`ADMIN` vs `ANALYST`).
-- **Headers HTTP Seguros:** Integración de `helmet` para proteger cabeceras HTTP.
-- **Protección CORS:** Habilitado para comunicación entre dominios.
-- **Límite de Tasa (Rate Limiting):** Prevención de ataques DDoS y fuerza bruta mediante `express-rate-limit`.
+## Roles
 
----
+| Rol | Permisos |
+| --- | --- |
+| `ADMIN` | Consultar y gestionar pólizas y agencias; consultar planes y reclamaciones |
+| `AGENT` | Consultar, crear y actualizar pólizas; consultar agencias, planes y reclamaciones |
+| `ANALYST` | Consulta de pólizas con datos de contacto del titular omitidos; consulta de agencias, planes y reclamaciones |
 
-## 🔑 Usuarios de Prueba
+La API no implementa todavía asignación de usuarios a agencias, por lo que las cuentas de agente comparten el conjunto de datos de demostración.
 
-| Email | Contraseña | Rol | Permisos |
-| :--- | :--- | :--- | :--- |
-| `admin@agencia.com` | `admin123` | **ADMIN** | Acceso total a lectura y creación de recursos |
-| `analista@agencia.com` | `admin123` | **ANALYST** | Lectura general y creación limitada a campañas |
+## Endpoints
 
----
+Las cookies de autenticación son HttpOnly. En producción también llevan `Secure`; para clientes que no gestionen cookies se acepta `Authorization: Bearer <access-token>` si disponen de uno.
 
-## 🚀 Instrucciones de Ejecución
+| Método | Ruta | Acceso | Uso |
+| --- | --- | --- | --- |
+| `POST` | `/api/auth/register` | Público, límite de autenticación | Registrar agente |
+| `POST` | `/api/auth/login` | Público, límite de autenticación | Iniciar sesión y emitir cookies |
+| `GET` | `/api/auth/me` | Usuario autenticado | Consultar perfil |
+| `POST` | `/api/auth/refresh` | Refresh cookie, límite de autenticación | Rotar refresh y renovar access |
+| `POST` | `/api/auth/logout` | Público | Revocar refresh y limpiar cookies |
+| `GET` | `/api/agencies` | Autenticado | Listar agencias |
+| `POST` | `/api/agencies` | `ADMIN` | Crear agencia |
+| `GET` | `/api/policies` | Autenticado | Listar pólizas |
+| `GET` | `/api/policies/:id` | Autenticado | Consultar póliza |
+| `POST` | `/api/policies` | `ADMIN`, `AGENT` | Crear póliza |
+| `PATCH` | `/api/policies/:id` | `ADMIN`, `AGENT` | Actualizar póliza |
+| `DELETE` | `/api/policies/:id` | `ADMIN` | Eliminar póliza |
+| `GET` | `/api/plans` | Autenticado | Listar planes de cobertura |
+| `GET` | `/api/claims` | Autenticado | Listar reclamaciones |
 
-1. Clonar o ingresar a la carpeta del proyecto:
-   cd agencia-marketing-api
+El alta de póliza requiere `policyNumber`, `holderName`, `holderEmail`, `plan`, `premium` (número positivo) y `startDate`. El estado inicial es `PENDING`. El número de póliza debe ser único.
 
-2. Instalar dependencias usando pnpm:
-   pnpm install
+## Controles de seguridad
 
-3. Verificar el archivo .env en la raíz con las variables:
-   PORT=3000
-   JWT_SECRET=MarketingAgencySuperSecretKey2024!
-
-4. Iniciar el servidor en modo desarrollo:
-   pnpm dev
-
----
-
-## 📡 Endpoints de la API
-
-### Autenticación (Pública)
-- **POST** `/api/auth/login` -> Iniciar sesión y obtener token JWT.
-
-### Entidades Protegidas (Requieren Header: `Authorization: Bearer <TOKEN>`)
-
-- **Clients (Clientes):**
-  - **GET** `/api/clients` -> Listar clientes (Cualquier usuario autenticado)
-  - **POST** `/api/clients` -> Crear cliente (Solo ROL: ADMIN)
-
-- **Campaigns (Campañas):**
-  - **GET** `/api/campaigns` -> Listar campañas (Cualquier usuario autenticado)
-  - **POST** `/api/campaigns` -> Crear campaña (ROLES: ADMIN o ANALYST)
-
-- **Channels (Canales):**
-  - **GET** `/api/channels` -> Listar canales de marketing (Cualquier usuario autenticado)
-
-- **Metrics (Métricas):**
-  - **GET** `/api/metrics` -> Listar métricas de campañas (Cualquier usuario autenticado)
+- Contraseñas con bcrypt y 10 rondas; las respuestas de login no revelan si falló el correo o la contraseña.
+- Access JWT de 15 minutos y refresh JWT de 7 días con secretos separados.
+- Refresh tokens guardados como hash bcrypt y rotados al renovar; logout revoca el token actual.
+- Cookies `HttpOnly`, `SameSite=Strict`, `Secure` en producción; no se envían tokens en el cuerpo JSON.
+- RBAC devuelve `401` sin autenticación y `403` ante un rol sin permiso.
+- Helmet, límite JSON de 10 KB, whitelist CORS, límite general de 100 solicitudes por 15 minutos y de autenticación de 10 por 15 minutos.
+- Rechazo de claves de entrada que contengan `$` o `.` para reducir riesgo de inyección NoSQL.
+- Errores internos no exponen stack traces ni detalles de implementación.

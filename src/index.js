@@ -2,29 +2,38 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { apiLimiter } from './middlewares/security.middleware.js';
-
 import authRoutes from './routes/auth.routes.js';
 import agencyRoutes from './routes/agency.routes.js';
+import { apiLimiter, getCorsOptions, sanitizeNoSqlInput } from './middlewares/security.middleware.js';
+
+if (!process.env.JWT_ACCESS_SECRET || !process.env.JWT_REFRESH_SECRET || process.env.JWT_ACCESS_SECRET.length < 32 || process.env.JWT_REFRESH_SECRET.length < 32 || process.env.JWT_ACCESS_SECRET === process.env.JWT_REFRESH_SECRET) {
+  throw new Error('Configura JWT_ACCESS_SECRET y JWT_REFRESH_SECRET distintos, ambos de al menos 32 caracteres, en .env');
+}
 
 const app = express();
-
-// --- SEMANA 8: MEDIDAS DE SEGURIDAD OWASP ---
-app.use(helmet()); // Seguridad de headers HTTP
-app.use(cors()); // Manejo de políticas CORS
-app.use(express.json({ limit: '10kb' })); // Control de tamaño de body
-app.use('/api', apiLimiter); // Protección contra tasa excesiva de peticiones
-
-// --- RUTAS DE LA APLICACIÓN ---
+app.disable('x-powered-by');
+app.use(helmet());
+app.use(cors(getCorsOptions()));
+app.use(express.json({ limit: '10kb' }));
+app.use(sanitizeNoSqlInput);
+app.use('/api', apiLimiter);
+app.get('/', (_req, res) => res.json({
+  service: 'API de agencias de seguros de salud',
+  status: 'ok',
+  health: '/health',
+  auth: '/api/auth',
+  resources: ['/api/agencies', '/api/policies', '/api/plans', '/api/claims']
+}));
+app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'health-insurance-agencies-api' }));
 app.use('/api/auth', authRoutes);
 app.use('/api', agencyRoutes);
 
-// Manejador de rutas no encontradas (404 estandarizado)
-app.use((req, res) => {
-  res.status(404).json({ error: 'Endpoint no encontrado' });
+app.use((_req, res) => res.status(404).json({ error: 'Endpoint no encontrado' }));
+app.use((err, _req, res, _next) => {
+  if (err.message === 'Origen no permitido por CORS') return res.status(403).json({ error: err.message });
+  const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 500 ? err.status : 500;
+  return res.status(status).json({ error: status === 500 ? 'Error interno del servidor' : err.message });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor ejecutándose correctamente en: http://localhost:${PORT}`);
-});
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`API de seguros de salud disponible en http://localhost:${port}`));

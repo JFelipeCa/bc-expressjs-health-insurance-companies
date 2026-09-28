@@ -1,7 +1,7 @@
 {
-  "name": "agencia-marketing-api",
+  "name": "health-insurance-agencies-api",
   "version": "1.0.0",
-  "description": "",
+  "description": "API Express para agencias de seguros de salud con autenticación JWT, RBAC y seguridad OWASP",
   "main": "index.js",
   "scripts": {
     "start": "node src/index.js",

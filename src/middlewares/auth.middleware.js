@@ -1,31 +1,27 @@
 import jwt from 'jsonwebtoken';
 
-// SEMANA 7: Verificación del JWT
+function readCookie(req, name) {
+  const cookieHeader = req.headers.cookie ?? '';
+  const entry = cookieHeader.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${name}=`));
+  if (!entry) return undefined;
+  try { return decodeURIComponent(entry.slice(name.length + 1)); } catch { return undefined; }
+}
+
 export const verifyToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Formato "Bearer TOKEN"
-
-  if (!token) {
-    return res.status(401).json({ error: 'Acceso denegado: Token no proporcionado' });
-  }
-
+  const authorization = req.headers.authorization;
+  const bearer = authorization?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
+  const token = bearer || readCookie(req, 'accessToken');
+  if (!token) return res.status(401).json({ error: 'Autenticación requerida' });
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(403).json({ error: 'Token inválido o expirado' });
+    req.user = jwt.verify(token, process.env.JWT_ACCESS_SECRET, { issuer: 'health-insurance-api' });
+    return next();
+  } catch {
+    return res.status(401).json({ error: 'Token inválido o expirado' });
   }
 };
 
-// SEMANA 8: Autorización basada en Roles (RBAC)
-export const requireRoles = (...allowedRoles) => {
-  return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ 
-        error: `Acceso denegado. Permisos requeridos: [${allowedRoles.join(', ')}]` 
-      });
-    }
-    next();
-  };
+export const requireRoles = (...allowedRoles) => (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Autenticación requerida' });
+  if (!allowedRoles.includes(req.user.role)) return res.status(403).json({ error: 'No tienes permisos para esta operación' });
+  return next();
 };

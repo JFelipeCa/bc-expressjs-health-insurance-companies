@@ -1,29 +1,19 @@
 import { Router } from 'express';
-import { 
-  getClients, createClient, 
-  getCampaigns, createCampaign, 
-  getChannels, 
-  getMetrics 
-} from '../controllers/agency.controller.js';
-import { verifyToken, requireRoles } from '../middlewares/auth.middleware.js';
+import { createAgency, createPolicy, deletePolicy, getAgencies, getClaims, getPlans, getPolicies, getPolicy, updatePolicy } from '../controllers/agency.controller.js';
+import { requireRoles, verifyToken } from '../middlewares/auth.middleware.js';
 
 const router = Router();
-
-// Aplica autenticación JWT obligatoria a todas estas rutas (Semana 7)
 router.use(verifyToken);
 
-// ENTIDAD 1: CLIENTS (Ver: ADMIN/ANALYST, Crear: Solo ADMIN - Semana 8)
-router.get('/clients', getClients);
-router.post('/clients', requireRoles('ADMIN'), createClient);
+router.get('/agencies', getAgencies);
+router.post('/agencies', requireRoles('ADMIN'), createAgency);
 
-// ENTIDAD 2: CAMPAIGNS (Ver: Todos, Crear: ADMIN y ANALYST)
-router.get('/campaigns', getCampaigns);
-router.post('/campaigns', requireRoles('ADMIN', 'ANALYST'), createCampaign);
+router.get('/policies', getPolicies);
+router.get('/policies/:id', getPolicy);
+router.post('/policies', requireRoles('ADMIN', 'AGENT'), createPolicy);
+router.patch('/policies/:id', requireRoles('ADMIN', 'AGENT'), updatePolicy);
+router.delete('/policies/:id', requireRoles('ADMIN'), deletePolicy);
 
-// ENTIDAD 3: CHANNELS
-router.get('/channels', getChannels);
-
-// ENTIDAD 4: METRICS
-router.get('/metrics', getMetrics);
-
+router.get('/plans', getPlans);
+router.get('/claims', getClaims);
 export default router;
